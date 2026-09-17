@@ -1,4 +1,4 @@
-# ✈️ VoeBem Analytics — Data Lakehouse & Governança de Dados com Databricks
+# VoeBem Analytics — Data Lakehouse & Governança de Dados com Databricks
 
 [![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=for-the-badge&logo=Databricks&logoColor=white)](https://databricks.com/)
 [![Apache Spark](https://img.shields.io/badge/Apache_Spark-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)](https://spark.apache.org/)
@@ -10,15 +10,15 @@
 
 ## 📌 Sobre o Projeto
 
-O **VoeBem Analytics** é um projeto de Engenharia de Dados de alta performance desenvolvido no contexto da **Imersão de Dados com IA da Alura**. O projeto tem como objetivo central a construção de um **Data Lakehouse governado e escalável** utilizando o ecossistema Databricks para processar dados abertos da **ANAC (Agência Nacional de Aviação Civil)**.
+O **VoeBem Analytics** é um projeto de Engenharia de Dados de alta performance desenvolvido durante a **Imersão de Dados com IA da Alura**. O objetivo central é a construção de um **Data Lakehouse governado e escalável** utilizando o ecossistema Databricks para processar dados abertos da **ANAC (Agência Nacional de Aviação Civil)**.
 
-A solução consolida 12 meses do histórico de **Voos Regulares Ativos (VRA)**, companhias aéreas e aeródromos brasileiros, transformando dados brutos e desalinhados em ativos de dados confiáveis, documentados e prontos para consumo por **Modelos de IA (LLMs)** e ferramentas de **Business Intelligence**.
+A solução consolida 12 meses do histórico de **Voos Regulares Ativos (VRA)**, companhias aéreas e aeródromos brasileiros, transformando dados brutos em ativos confiáveis, totalmente documentados e otimizados para consumo por **Modelos de IA (LLMs)** e ferramentas de **Business Intelligence**.
 
 ---
 
-## 🏗️ Arquitetura Lakehouse (Arquitetura Medalhão)
+##  Arquitetura Lakehouse (Arquitetura Medalhão)
 
-A solução adota o padrão **Medallion Architecture**, dividindo o ciclo de vida dos dados em três camadas de maturidade gerenciadas pelo **Unity Catalog**:
+A solução adota o padrão **Medallion Architecture**, dividindo o ciclo de vida dos dados em camadas de maturidade gerenciadas pelo **Unity Catalog**:
 
 ┌────────────────┐     ┌────────────────┐     ┌────────────────┐
 │  Raw Storage   │ ──> │ Bronze Schema  │ ──> │ Silver Schema  │ ──> Gold Schema
@@ -26,16 +26,16 @@ A solução adota o padrão **Medallion Architecture**, dividindo o ciclo de vid
 └────────────────┘     └────────────────┘     └────────────────┘
 
 
-### 🗂️ Organização no Unity Catalog
+###  Organização no Unity Catalog
 * **Catálogo:** `voebem`
 * **Volume (Landing Zone):** `voebem.bronze.v_raw_anac` (Armazenamento dos CSVs brutos)
 * **Esquemas (Schemas):** `bronze`, `silver`, `gold`
 
 ---
 
-## 🛠️ Mapeamento do Pipeline de Dados
+##  Mapeamento do Pipeline de Dados
 
-### 🥉 1. Camada Bronze — *Raw Ingestion* (Aula 2)
+###  1. Camada Bronze — *Raw Ingestion*
 * **Objetivo:** Ingestão bruta, imutável e idempotente dos dados originais sem perda de informação.
 * **Características & Boas Práticas:**
   * **Zero Filtros:** Carga integral dos arquivos CSV preservando 100% da estrutura de origem.
@@ -47,15 +47,15 @@ A solução adota o padrão **Medallion Architecture**, dividindo o ciclo de vid
 
 ---
 
-### 🥈 2. Camada Silver — *Governed Mirror* & Qualidade (Aula 3)
+###  2. Camada Silver — *Governed Mirror* & Qualidade
 * **Objetivo:** Limpeza técnica, padronização de tipos, tratamento de valores nulos e cálculo de métricas nativas sem violar regras de negócio.
-* **Princípio Pétreo:** *A Silver é o espelho governado da Bronze*. Não descarta dados nem aplica decisões comerciais restritivas (ex: filtros de datas ou descarte de atrasos).
+* **Princípio Pétreo:** *A Silver é o espelho governado da Bronze*. Não descarta dados nem aplica decisões comerciais restritivas (ex: filtros de datas ou eliminação de registros atípicos).
 * **Tratamentos & Engenharia de Dados Aplicada:**
   1. **Tipagem Estrita e Segura:**
      * Utilização de `try_cast(... AS TIMESTAMP)` para tratar múltiplos formatos de data/hora de partida e chegada real/prevista.
      * Tipagem numérica para códigos ICAO/IATA e contadores de passageiros/carga.
   2. **Tratamento de Indefinições:**
-     * Aplicação de `NULLIF(coluna, 'null')` para converter strings `'null'` e vazias em valores nulos de banco de dados nativos (`NULL`).
+     * Aplicação de `NULLIF(coluna, 'null')` para converter strings `'null'` e vazias em valores nulos nativos de banco de dados (`NULL`).
   3. **Aritmética Direta de Métricas:**
      * Cálculo exato dos atrasos em minutos:
        * `atraso_partida_min = TIMESTAMPDIFF(MINUTE, partida_prevista, partida_real)`
@@ -68,9 +68,9 @@ A solução adota o padrão **Medallion Architecture**, dividindo o ciclo de vid
 
 ---
 
-## 🤖 Governança de Dados & Preparação para IA (Databricks Genie)
+##  Governança de Dados & Preparação para IA (Databricks Genie)
 
-Um dos pilares do projeto é garantir que o **Data Lakehouse** esteja otimizado para interação com soluções de **IA Generativa (LLMs)** e o **Databricks Genie** (IA Conversacional do Databricks).
+O Data Lakehouse foi otimizado para interagir com soluções de **IA Generativa (LLMs)** e com o **Databricks Genie** (IA Conversacional do Databricks):
 
 1. **Documentação de Campo (100% Coverage):**
    * Todas as colunas de todas as tabelas na camada Silver possuem comentários nativos em linguagem de negócio via `COMMENT ON COLUMN`.
@@ -84,16 +84,16 @@ Um dos pilares do projeto é garantir que o **Data Lakehouse** esteja otimizado 
 
 ---
 
-## ⚙️ Orquestração & Rastreabilidade (Databricks Jobs)
+##  Orquestração & Rastreabilidade (Databricks Jobs)
 
 O pipeline é totalmente orquestrado através do **Databricks Jobs**, permitindo:
 * Execução em esteira automatizada com dependência DAG (Bronze ➔ Silver ➔ Gold).
 * Rastreabilidade fim a fim (Data Lineage) visível nativamente no **Unity Catalog**.
-* Reprocessamento idempotente em caso de falhas ou reexecução diária.
+* Reprocessamento idempotente em caso de falhas ou reexecução programada.
 
 ---
 
-## 🧪 Testes de Qualidade & SQL Snippets
+##  Testes de Qualidade & SQL Snippets
 
 ### 1. Teste de Paridade de Linhas (Bronze vs. Silver)
 Garantia de que a camada Silver manteve a integridade completa dos dados sem perdas não documentadas:
@@ -103,4 +103,35 @@ SELECT
     (SELECT COUNT(*) FROM voebem.bronze.vra) AS linhas_bronze,
     (SELECT COUNT(*) FROM voebem.silver.vra) AS linhas_silver,
     (SELECT COUNT(*) FROM voebem.bronze.vra) - (SELECT COUNT(*) FROM voebem.silver.vra) AS diferenca_abs;
--- Resultado: 1.014.705 | 1.014.705 | Diferença: 0
+-- Resultado esperado: 1.014.705 | 1.014.705 | Diferença: 0
+### 2. Validação Automática de Cobertura de Governança
+Query de auditoria no information_schema para assegurar que 100% das colunas possuem documentação:
+
+SQL
+SELECT 
+    table_name,
+    COUNT(*) AS total_colunas,
+    SUM(CASE WHEN comment IS NOT NULL AND comment <> '' THEN 1 ELSE 0 END) AS colunas_documentadas,
+    ROUND(100.0 * SUM(CASE WHEN comment IS NOT NULL AND comment <> '' THEN 1 ELSE 0 END) / COUNT(*), 1) AS pct_cobertura
+FROM voebem.information_schema.columns
+WHERE table_schema = 'silver'
+GROUP BY table_name;
+ Tecnologias Utilizadas
+Computação e Plataforma: Databricks / Unity Catalog
+
+Motor de Dados: Apache Spark (PySpark & Databricks SQL Engine)
+
+Formato de Armazenamento: Delta Lake
+
+Inteligência Artificial: Databricks Assistant & Databricks Genie
+
+Orquestração: Databricks Jobs
+
+Linguagens: SQL & Python
+
+ Autor
+Gabriel Sorge de Almeida
+
+Graduando em Ciência de Dados e Inteligência Artificial na PUC-Campinas
+
+Foco de Atuação: Engenharia de Dados, Cloud Computing (AWS/Databricks), Pipeline de Dados & IA.
