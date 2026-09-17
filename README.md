@@ -129,5 +129,7 @@ GROUP BY table_name;
 
 ## Autor
 Gabriel Sorge de Almeida
+
 Graduando em Ciência de Dados e Inteligência Artificial na PUC-Campinas
+
 Foco de Atuação: Engenharia de Dados, Cloud Computing (AWS/Databricks), Pipeline de Dados & IA.
