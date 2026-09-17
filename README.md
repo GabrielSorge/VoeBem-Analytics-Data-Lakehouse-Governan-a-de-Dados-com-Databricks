@@ -103,11 +103,13 @@ SELECT
     (SELECT COUNT(*) FROM voebem.bronze.vra) AS linhas_bronze,
     (SELECT COUNT(*) FROM voebem.silver.vra) AS linhas_silver,
     (SELECT COUNT(*) FROM voebem.bronze.vra) - (SELECT COUNT(*) FROM voebem.silver.vra) AS diferenca_abs;
+```
 -- Resultado esperado: 1.014.705 | 1.014.705 | Diferença: 0
+
 ### 2. Validação Automática de Cobertura de Governança
 Query de auditoria no information_schema para assegurar que 100% das colunas possuem documentação:
 
-SQL
+```SQL
 SELECT 
     table_name,
     COUNT(*) AS total_colunas,
@@ -116,22 +118,16 @@ SELECT
 FROM voebem.information_schema.columns
 WHERE table_schema = 'silver'
 GROUP BY table_name;
- Tecnologias Utilizadas
-Computação e Plataforma: Databricks / Unity Catalog
+```
+## Tecnologias Utilizadas
+* Computação e Plataforma: Databricks / Unity Catalog
+* Motor de Dados: Apache Spark (PySpark & Databricks SQL Engine)
+* Formato de Armazenamento: Delta Lake
+* Inteligência Artificial: Databricks Assistant & Databricks Genie
+* Orquestração: Databricks Jobs
+* Linguagens: SQL & Python
 
-Motor de Dados: Apache Spark (PySpark & Databricks SQL Engine)
-
-Formato de Armazenamento: Delta Lake
-
-Inteligência Artificial: Databricks Assistant & Databricks Genie
-
-Orquestração: Databricks Jobs
-
-Linguagens: SQL & Python
-
- Autor
+## Autor
 Gabriel Sorge de Almeida
-
 Graduando em Ciência de Dados e Inteligência Artificial na PUC-Campinas
-
 Foco de Atuação: Engenharia de Dados, Cloud Computing (AWS/Databricks), Pipeline de Dados & IA.
