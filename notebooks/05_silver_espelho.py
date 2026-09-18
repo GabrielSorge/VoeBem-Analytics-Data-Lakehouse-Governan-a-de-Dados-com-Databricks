@@ -3,42 +3,6 @@
 # [tool.databricks.environment]
 # environment_version = "5"
 # ///
-# MAGIC %md
-# MAGIC # Silver — espelho governado do bronze
-# MAGIC
-# MAGIC A regra da casa, e ela não é negociável:
-# MAGIC
-# MAGIC > **A silver é o espelho do bronze com governança aplicada.**
-# MAGIC > Mesmo nome de tabela, mesmo grão, **mesma contagem de linhas**.
-# MAGIC
-# MAGIC | | permitido na silver | proibido na silver |
-# MAGIC |---|---|---|
-# MAGIC | tipagem | ✅ string vira `TIMESTAMP`, `INT`, `DATE` | |
-# MAGIC | legibilidade | ✅ quebrar timestamp em data e hora | |
-# MAGIC | metadados | ✅ `COMMENT` em toda coluna, tags na tabela | |
-# MAGIC | unificação | ✅ dois cadastros do mesmo assunto, com a origem por registro | |
-# MAGIC | aritmética pura | ✅ `atraso = real - previsto` | |
-# MAGIC | filtro / `WHERE` de negócio | | ❌ |
-# MAGIC | `GROUP BY` / agregação | | ❌ |
-# MAGIC | limiar, flag, classificação | | ❌ |
-# MAGIC
-# MAGIC **Por quê?** Porque a silver precisa servir várias análises, e toda linha que ela
-# MAGIC descarta é uma pergunta que ninguém mais vai conseguir fazer. Filtro fecha porta.
-# MAGIC
-# MAGIC O teste para qualquer coluna nova: *isso embute uma decisão de negócio?*
-# MAGIC `atraso_partida_min = partida_real - partida_prevista` é subtração — silver.
-# MAGIC `partida_pontual = atraso <= 15` embute o número **15**, que é decisão de negócio
-# MAGIC e muda por cliente — gold.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 1. O que precisa ser consertado na tipagem
-# MAGIC
-# MAGIC Antes de escrever o `CAST`, medir. Duas armadilhas escondidas no bronze:
-
-# COMMAND ----------
-
 display(spark.sql("""
     SELECT
       COUNT(*)                                                        AS linhas,
@@ -48,36 +12,6 @@ display(spark.sql("""
       SUM(CASE WHEN partida_prevista LIKE '%.%' THEN 1 ELSE 0 END)    AS com_fracao_de_segundo
     FROM voebem.bronze.vra
 """))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC **Armadilha 1 — a ausência veio como a string `'null'`.** Quatro caracteres de texto.
-# MAGIC `WHERE partida_real IS NULL` devolve **zero** numa tabela onde 29 mil voos não têm
-# MAGIC horário real. Correção: `nullif(coluna, 'null')` **antes** do cast.
-# MAGIC
-# MAGIC **Armadilha 2 — dois formatos de timestamp no mesmo arquivo.** A maioria vem
-# MAGIC `2026-01-27 19:45:00`, mas ~80 mil linhas vêm com fração de segundo de 9 casas.
-# MAGIC Um `to_timestamp(col, 'yyyy-MM-dd HH:mm:ss')` fixo devolveria NULL para 8% da base,
-# MAGIC em silêncio. O `try_cast(... AS TIMESTAMP)` aceita os dois formatos, e o `try_`
-# MAGIC garante que um formato novo vire NULL em vez de derrubar o job.
-# MAGIC
-# MAGIC Note que isso é **tipagem**, não limpeza de negócio: `'null'` é a forma como a fonte
-# MAGIC escreve "ausente". Traduzir isso para `NULL` é dizer a mesma coisa no tipo certo.
-# MAGIC Nenhuma linha sai.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 2. `silver.vra` — o espelho
-# MAGIC
-# MAGIC Repare no que **não** existe nesta query: nenhum `WHERE`, nenhum `GROUP BY`,
-# MAGIC nenhum `DISTINCT`, nenhum `JOIN`. É um `SELECT` de projeção sobre o bronze inteiro.
-# MAGIC
-# MAGIC E repare nas três colunas do fim: `atraso_partida_min`, `atraso_chegada_min` e
-# MAGIC `minutos_recuperados`. São subtrações entre colunas da própria linha. Não têm
-# MAGIC limiar, não classificam nada, não escondem número mágico — e, principalmente,
-# MAGIC não impedem análise nenhuma. Por isso podem morar aqui.
 
 # COMMAND ----------
 
@@ -144,15 +78,6 @@ print("silver.vra criada")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 3. A prova que importa: mesma contagem
-# MAGIC
-# MAGIC Este é o critério objetivo do marco. Se a diferença não for **zero**, a silver
-# MAGIC não é espelho — é recorte, e alguém em algum momento vai fazer uma pergunta que
-# MAGIC ela não consegue mais responder.
-
-# COMMAND ----------
-
 display(spark.sql("""
     SELECT
       (SELECT COUNT(*) FROM voebem.bronze.vra) AS bronze_vra,
@@ -160,11 +85,6 @@ display(spark.sql("""
       (SELECT COUNT(*) FROM voebem.bronze.vra)
         - (SELECT COUNT(*) FROM voebem.silver.vra) AS diferenca
 """))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC E a tipagem funcionou? Contagem de conversões bem-sucedidas por coluna:
 
 # COMMAND ----------
 
@@ -189,23 +109,6 @@ display(spark.sql("""
     ORDER BY partida_prevista
     LIMIT 5
 """))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 4. `silver.empresas` — o caso clássico dos dois sistemas
-# MAGIC
-# MAGIC Aqui a silver faz a única coisa que muda a forma da tabela: **unifica dois cadastros
-# MAGIC do mesmo assunto**. `bronze.empresas_nacionais` e `bronze.empresas_estrangeiras` são
-# MAGIC dois processos administrativos da ANAC descrevendo a mesma entidade de negócio —
-# MAGIC "empresa aérea que opera no Brasil".
-# MAGIC
-# MAGIC Isso é permitido porque **não perde informação**: a contagem da silver é a soma exata
-# MAGIC das duas, e `origem_cadastro` guarda por registro de onde ele veio. Quem quiser
-# MAGIC voltar a olhar só as estrangeiras, consegue. Nada fecha.
-# MAGIC
-# MAGIC O que seria proibido: um `WHERE situacao = 'ATIVA'` aqui. Empresa que encerrou
-# MAGIC operação continua tendo voado no período — filtrar apagaria o histórico dela.
 
 # COMMAND ----------
 
@@ -262,32 +165,6 @@ display(spark.sql("""
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC > Este `GROUP BY` é **conferência**, não construção. A tabela já está escrita; o
-# MAGIC > agrupamento aqui só serve para eu olhar o resultado. A proibição vale para o que
-# MAGIC > é **materializado** na silver.
-# MAGIC
-# MAGIC Só 20 das 729 empresas nacionais têm código ICAO — o cadastro é dominado por aviação
-# MAGIC agrícola, táxi aéreo e aeroclube, que não têm código de três letras. Quem voa linha
-# MAGIC regular tem. Isso volta no marco-07, quando o join com o VRA for medido.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 5. `silver.aerodromos` e `silver.codigos_operacao` — espelhos
-# MAGIC
-# MAGIC Uma tabela de referência para cada uma do bronze, tipada e documentada. Duas coisas
-# MAGIC valem comentário:
-# MAGIC
-# MAGIC - `altitude` vem como `"193,0"` — vírgula decimal. Vira `DOUBLE` com um `replace`.
-# MAGIC - a coluna que o cabeçalho chama de `UF` contém `"Acre"`, `"São Paulo"`: é o **nome
-# MAGIC   da unidade federativa por extenso**, não a sigla. Quem escrever `WHERE uf = 'SP'`
-# MAGIC   recebe zero linhas e vai achar que o dado sumiu. O nome da coluna passa a dizer a
-# MAGIC   verdade (`uf_nome`) e o `COMMENT` avisa. Renomear e documentar é governança;
-# MAGIC   inventar a sigla seria transformação de negócio.
-
-# COMMAND ----------
-
 spark.sql("""
 CREATE OR REPLACE TABLE voebem.silver.aerodromos AS
 SELECT
@@ -326,19 +203,6 @@ display(spark.sql("""
            (SELECT COUNT(*) FROM voebem.bronze.codigos_operacao),
            (SELECT COUNT(*) FROM voebem.silver.codigos_operacao)
 """))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 6. Metadados gerenciados
-# MAGIC
-# MAGIC Documentação não é enfeite: o consumidor final deste pipeline é um **LLM**, e o
-# MAGIC `COMMENT` é literalmente o que ele lê para decidir qual coluna usar. Coluna sem
-# MAGIC comentário é coluna que a IA vai usar errado.
-# MAGIC
-# MAGIC O comentário descreve **significado de negócio**, não tipo de dado. "TIMESTAMP da
-# MAGIC partida" não ajuda ninguém; "horário em que a aeronave efetivamente saiu do solo"
-# MAGIC ajuda.
 
 # COMMAND ----------
 
@@ -426,13 +290,6 @@ for tabela, mapa in [
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC Comentário de tabela e **tags**. Tag é metadado de busca e de política: é como alguém
-# MAGIC que nunca viu este projeto encontra "todas as tabelas da camada silver" ou "tudo que
-# MAGIC é do domínio aviação" sem precisar perguntar para a gente.
-
-# COMMAND ----------
-
 TABELAS = {
     "voebem.silver.vra": (
         "Silver - espelho governado de bronze.vra. Mesmo grao (uma linha por etapa de voo) e "
@@ -468,13 +325,6 @@ for tabela, (comentario, tags) in TABELAS.items():
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 7. Auditoria da governança: 100% das colunas comentadas?
-# MAGIC
-# MAGIC "Documentei tudo" é afirmação, não fato. O `information_schema` responde de verdade:
-
-# COMMAND ----------
-
 display(spark.sql("""
     SELECT table_name,
            COUNT(*)                                                          AS colunas,
@@ -495,19 +345,6 @@ display(spark.sql("""
     WHERE schema_name = 'silver'
     ORDER BY table_name, tag_name
 """))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 8. Fechamento do marco
-# MAGIC
-# MAGIC A silver tem quatro tabelas, todas espelho do bronze, todas documentadas, e a `vra`
-# MAGIC com exatamente a mesma contagem de linhas da origem.
-# MAGIC
-# MAGIC O que **não** está aqui, de propósito: `partida_pontual`, `escopo`, qualquer
-# MAGIC agregação. O limiar de 15 minutos é uma decisão do cliente — outra seguradora pode
-# MAGIC trabalhar com 30. Se ele estivesse cravado na silver, atender esse outro cliente
-# MAGIC significaria reprocessar a camada inteira. Na gold, é uma linha de SQL.
 
 # COMMAND ----------
 
